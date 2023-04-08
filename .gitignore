@@ -1,0 +1,4 @@
+venv/
+.idea/
+/PyGame-Learning-Environment/
+__pycache__/
