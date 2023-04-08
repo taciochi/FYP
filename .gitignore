@@ -2,3 +2,4 @@ venv/
 .idea/
 /PyGame-Learning-Environment/
 __pycache__/
+brains/
