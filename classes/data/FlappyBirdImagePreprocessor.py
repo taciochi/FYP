@@ -1,7 +1,6 @@
 import cv2
 from torch import tensor, Tensor
 from torch import float32 as t_float
-from torchvision.transforms import Resize
 from numpy import vectorize, ndarray, expand_dims
 
 from classes.Globals import Globals
