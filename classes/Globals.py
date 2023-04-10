@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict
 
 from torch import device
 from torch.cuda import is_available

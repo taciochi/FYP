@@ -1,10 +1,9 @@
 from random import random, randrange
-from typing import List, Union, Dict
 
+from torch import no_grad
 from torch import zeros, Tensor
 from torch.nn import Conv2d, Linear
 from torch.nn.functional import relu
-from torch import argmax as t_argmax
 
 from interfaces.model.Model import Model
 
@@ -35,8 +34,9 @@ class DQN(Model):
     def get_action(self, x: Tensor, epsilon: float) -> int:
         if random() < epsilon:
             return randrange(self.fc2.out_features)
-        q_val = self.forward(x=x)
-        return q_val.max(1)[1].item()
+        with no_grad():
+            q_val = self.forward(x=x)
+            return q_val.max(1)[1].item()
 
     def get_conv_output_size(self, width: int, height: int) -> int:
         img = zeros(size=(1, height, width), requires_grad=False)
