@@ -13,15 +13,13 @@ class Globals:
     INIT_EPSILON: float = 0.5
     MEMORY_SIZE: int = 1_000
     EPSILON_DECAY: float = 0.97
-    COPTER_BRAIN_FILE_NAME: str = 'copter.pth'
-    FLAPPY_BRAIN_FILE_NAME: str = 'flappy.pth'
     NUMBER_OF_EPISODES: int = 1_200
     BRAIN_DIR_PATH: str = 'brains/'
     DEVICE_TYPE: device = device('cuda:0' if is_available() else 'cpu')
     REWARD_VALUES: Dict[str, float] = {
         'negative': -8.0,
         'positive': 10.0,
-        'tick': 0.00,
+        'tick': 0.05,
         'loss': -8,
         'win': 10.0
     }

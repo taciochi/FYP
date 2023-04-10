@@ -68,10 +68,10 @@ class ReplayBuffer:
         weights = tensor(weights, requires_grad=False, dtype=t_float32).to(Globals.DEVICE_TYPE)
 
         batch = list(zip(*memories_sample))
-        states = cat(batch[0])
+        states = cat(batch[0]).to(Globals.DEVICE_TYPE)
         actions = tensor(batch[1], requires_grad=False).to(Globals.DEVICE_TYPE)
         rewards = tensor(batch[2], requires_grad=False, dtype=t_float32).to(Globals.DEVICE_TYPE)
-        next_states = cat(batch[3])
+        next_states = cat(batch[3]).to(Globals.DEVICE_TYPE)
         # data type as float to convert into numbers
         terminals = tensor(batch[4], requires_grad=False, dtype=t_float32).to(Globals.DEVICE_TYPE)
 

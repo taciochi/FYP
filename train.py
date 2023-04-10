@@ -101,7 +101,7 @@ def train(env: PLE, action_set: Dict[int, Union[int, None]], current: Model, tar
 
     for frame_number in range(1, number_of_frames + 1):
         epsilon: float = get_epsilon(frame_number)
-        action: int = current.get_action(x=state, epsilon=epsilon)
+        action: int = current.get_action(x=state.to(Globals.DEVICE_TYPE), epsilon=epsilon)
         reward: float = env.act(action=action_set[action])
         is_done: bool = env.game_over()
         next_state: Tensor = PixelCopterImagePreprocessor.preprocess_image(env.getScreenGrayscale().T,
@@ -122,7 +122,7 @@ def train(env: PLE, action_set: Dict[int, Union[int, None]], current: Model, tar
                          target=target, optimizer=OPTIMIZER)
             losses.append(loss)
 
-        if frame_number % frame_update_threshold == 0:
+        if frame_number % frame_update_threshold == 0 and frame_number >= replay_amount:
             update_target(current=current, target=target)
             save_model(model=target, file_name=f'{FILE_NAME}_state_dict.pth')
 
@@ -169,8 +169,8 @@ if __name__ == '__main__':
     GAME_WIDTH: int = 256
     GAME_HEIGHT: int = 512
     CAPACITY: int = 5_000
-    REPLAY_AMOUNT: int = 100
+    REPLAY_AMOUNT: int = 300
     NUMBER_OF_FRAMES: int = 100_000
-    FRAME_UPDATE_THRESHOLD: int = 500
+    FRAME_UPDATE_THRESHOLD: int = 100
     train_agents(game_width=GAME_WIDTH, game_height=GAME_HEIGHT, number_of_frames=NUMBER_OF_FRAMES, capacity=CAPACITY,
                  alpha=ALPHA, frame_update_threshold=FRAME_UPDATE_THRESHOLD, replay_amount=REPLAY_AMOUNT)

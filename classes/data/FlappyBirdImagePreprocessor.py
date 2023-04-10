@@ -18,4 +18,4 @@ class FlappyBirdImagePreprocessor(Preprocessor):
         image = FlappyBirdImagePreprocessor.__get_edges(image=image)
         image = vectorize(lambda pixel: pixel / 255)(image)  # normalize image
         image = expand_dims(image, axis=0)  # add channels input
-        return tensor(data=image, requires_grad=requires_grad, device=Globals.DEVICE_TYPE, dtype=t_float)
+        return tensor(data=image, requires_grad=requires_grad, dtype=t_float)
