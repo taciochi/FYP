@@ -1,13 +1,12 @@
 from typing import List, Tuple, Union
 
-from numpy import ndarray
-from numpy import zeros as n_zeros
+from numpy import ndarray, zeros
 from torch import Tensor, cat, tensor
 from torch import float32 as t_float32
 from numpy import float32 as n_float32
 from numpy.random import choice as n_choice
 
-from classes.Globals import Globals
+from classes.utils.Globals import Globals
 
 
 class ReplayBuffer:
@@ -24,12 +23,17 @@ class ReplayBuffer:
 
         self.__buffer = []
         self.__index = 0
-        self.__priorities = n_zeros((capacity,), dtype=n_float32)
+        self.__priorities = zeros((capacity,), dtype=n_float32)
 
     def __len__(self) -> int:
         return len(self.__buffer)
 
-    def update_priorities(self, indices, priorities) -> None:
+    def clear_memory(self) -> None:
+        self.__buffer = []
+        self.__index = 0
+        self.__priorities = zeros((self.__CAPACITY,), dtype=n_float32)
+
+    def update_priorities(self, indices: List[int], priorities: ndarray) -> None:
         for index, priority in zip(indices, priorities):
             self.__priorities[index] = priority
 
@@ -52,7 +56,8 @@ class ReplayBuffer:
         # update index
         self.__index = (self.__index + 1) % self.__CAPACITY
 
-    def get_sample(self, amount_of_memories: int, beta: float):
+    def get_sample(self, amount_of_memories: int, beta: float) -> Tuple[Tensor, Tensor, Tensor,
+                                                                        Tensor, Tensor, List[int], Tensor]:
         # compute probabilities
         priorities: ndarray = self.__priorities if self.__len__() == self.__CAPACITY else \
             self.__priorities[:self.__index]
@@ -63,9 +68,10 @@ class ReplayBuffer:
         memories_sample: List = [self.__buffer[idx] for idx in memories_indices]
 
         # compute weights
-        weights: Union[ndarray, Tensor] = (self.__len__() * probabilities[memories_indices] ** (-beta))
-        weights /= weights.max()
-        weights = tensor(weights, requires_grad=False, dtype=t_float32).to(Globals.DEVICE_TYPE)
+        tmp_weights: ndarray = (self.__len__() * probabilities[memories_indices] ** (-beta))
+        tmp_weights /= tmp_weights.max()
+        weights: Tensor = tensor(tmp_weights, requires_grad=False, dtype=t_float32).to(Globals.DEVICE_TYPE)
+        del tmp_weights
 
         batch = list(zip(*memories_sample))
         states = cat(batch[0]).to(Globals.DEVICE_TYPE)

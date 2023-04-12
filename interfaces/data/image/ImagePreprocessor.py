@@ -1,10 +1,10 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 
 from torch import Tensor
 from numpy import ndarray
 
 
-class Preprocessor(metaclass=ABCMeta):
+class ImagePreprocessor(metaclass=ABCMeta):
 
     @classmethod
     def __subclasshook__(cls, subclass):
