@@ -171,7 +171,7 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
         'update_threshold': update_threshold
     }
 
-    for is_flappy in [True, False]:
+    for is_flappy in [False, True]:
         brain_dir: str = Globals.BRAIN_FLAPPY_DIR_PATH if is_flappy else Globals.BRAIN_COPTER_DIR_PATH
         game_name: str = 'flappy' if is_flappy else 'copter'
         env: PLE = get_environment(is_flappy=is_flappy)
@@ -187,9 +187,9 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
             current_brain: Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
                                  LinearDQN, LinearDuelingDQN] = get_brain(brain_type=brain_type, env=env)
 
-            # if is_flappy:
-            #     state_dict: dict = t_load(f=f'{Globals.BRAIN_COPTER_DIR_PATH}{brain_type}.pth')
-            #     current_brain.load_state_dict(state_dict=state_dict)
+            if is_flappy:
+                state_dict: dict = t_load(f=f'{Globals.BRAIN_COPTER_DIR_PATH}{brain_type}.pth')
+                current_brain.load_state_dict(state_dict=state_dict)
 
             kwa['file_name'] = FILE_NAME
             kwa['current_brain'] = current_brain.to(Globals.DEVICE_TYPE)
@@ -206,7 +206,7 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
             print(f'{game_name} {brain_type} took {training_end} seconds to train')
 
             Artist.save_line_graph(plot_data=losses, plot_title=f'{game_name}_{brain_type}_losses.png')
-            Artist.save_line_graph(plot_data=losses, plot_title=f'{game_name}_{brain_type}_losses.png')
+            Artist.save_line_graph(plot_data=rewards, plot_title=f'{game_name}_{brain_type}_rewards.png')
 
 
 if __name__ == '__main__':
@@ -214,7 +214,7 @@ if __name__ == '__main__':
         'alpha': 0.6,
         'capacity': 2_500,
         'replay_amount': 200,
-        'number_of_frames': 100_000,
+        'number_of_frames': 5000,
         'update_threshold': 400
     }
 

@@ -9,7 +9,7 @@ from matplotlib.pyplot import imshow, plot, title, savefig, clf
 
 class Artist:
     __DPI: int = 1000
-    __IMAGES_DIR_PATH: str = 'image/'
+    __IMAGES_DIR_PATH: str = 'images/'
 
     @staticmethod
     def __save_to_disk(file_name: str) -> None:
