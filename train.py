@@ -214,7 +214,7 @@ if __name__ == '__main__':
         'alpha': 0.6,
         'capacity': 2_500,
         'replay_amount': 200,
-        'number_of_frames': 5000,
+        'number_of_frames': 50_000,
         'update_threshold': 400
     }
 

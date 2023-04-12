@@ -10,7 +10,7 @@ class Globals:
     BRAIN_DIR_PATH: str = 'brains/'
     BRAIN_COPTER_DIR_PATH: str = BRAIN_DIR_PATH + 'copter/'
     BRAIN_FLAPPY_DIR_PATH: str = BRAIN_DIR_PATH + 'flappy/'
-    BRAIN_TYPES: List[str] = ['linear_dqn']
+    BRAIN_TYPES: List[str] = ['linear_dueling_dqn', 'linear_dqn']
     # BRAIN_TYPES: List[str] = ['linear_dqn', 'linear_dueling_dqn', 'convolutional_dqn', 'convolutional_dueling_dqn']
 
     GAME_WIDTH: int = 256

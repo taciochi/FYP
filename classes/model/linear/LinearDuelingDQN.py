@@ -27,7 +27,11 @@ class LinearDuelingDQN(LinearModel):
         latent: Tensor = relu(self.fc1(x))
         latent = relu(self.fc2(latent))
         latent = relu(self.fc3(latent))
-        q: Tensor = self.fc4(self.dropout(latent))
+        adv: Tensor = relu(self.fc1_adv(latent))
+        adv = self.fc2_adv(self.dropout(adv))
+        val: Tensor = relu(self.fc1_val(latent))
+        val = self.fc2_val(self.dropout(val))
+        q: Tensor = val + adv + adv.mean(1, keepdim=True)
         return q
 
     def get_action(self, x: Tensor, epsilon: float) -> int:
