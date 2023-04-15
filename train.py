@@ -1,3 +1,4 @@
+import sys
 from os import mkdir
 from math import inf
 from math import exp
@@ -60,29 +61,24 @@ def save_model(model: Union[ConvolutionalDQN, ConvolutionalDuelingDQN, LinearDQN
 
 def get_environment(is_flappy: bool, brain_type: str) -> PLE:
     GAME: Union[Pixelcopter, FlappyBird]
-    GAME_WIDTH: int = 256
-    GAME_HEIGHT: int = 512
-    GAME = Pixelcopter(width=384, height=384) if 'linear' in brain_type else Pixelcopter(width=GAME_WIDTH,
-                                                                                         height=GAME_HEIGHT)
+    GAME = Pixelcopter(width=384, height=384) if 'linear' in brain_type else Pixelcopter(width=384,
+                                                                                         height=384)
     if is_flappy:
-        GAME = FlappyBird() if 'linear' in brain_type else FlappyBird(width=GAME_WIDTH, height=GAME_HEIGHT)
+        GAME = FlappyBird() if 'linear' in brain_type else FlappyBird()
     return PLE(GAME, reward_values=Globals.TRAINING_REWARD_VALUES, display_screen=True)
 
 
 def get_brain(brain_type: str, env: PLE) -> Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
                                                   LinearDQN, LinearDuelingDQN]:
     number_of_actions: int = len(env.getActionSet())
-    GAME_WIDTH: int
-    GAME_HEIGHT: int
-    GAME_WIDTH, GAME_HEIGHT = env.getScreenDims()
     if 'linear' in brain_type:
         return LinearDuelingDQN(number_of_observations=7,
                                 number_of_actions=number_of_actions) if 'dueling' in brain_type else \
             LinearDQN(number_of_observations=7, number_of_actions=number_of_actions)
-    return ConvolutionalDuelingDQN(in_channels=1, number_of_actions=number_of_actions, game_height=GAME_HEIGHT,
-                                   game_width=GAME_WIDTH) if 'dueling' in brain_type else \
-        ConvolutionalDQN(in_channels=1, number_of_actions=number_of_actions, game_width=GAME_WIDTH,
-                         game_height=GAME_HEIGHT)
+    return ConvolutionalDuelingDQN(in_channels=1, number_of_actions=number_of_actions, game_height=Globals.IMG_SIZE,
+                                   game_width=Globals.IMG_SIZE) if 'dueling' in brain_type else \
+        ConvolutionalDQN(in_channels=1, number_of_actions=number_of_actions, game_width=Globals.IMG_SIZE,
+                         game_height=Globals.IMG_SIZE)
 
 
 def get_preprocessing_function(is_flappy: bool, brain_type: str) -> callable:
@@ -130,9 +126,9 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
     rewards: List[float] = []
     env.reset_game()
     env.act(0)
-    state: Tensor = preprocess(get_state())
+    state: Tensor = preprocess(get_state().T if 'conv' in brain_type else get_state())
     episode_reward: float = 0.0
-    OPTIMIZER: Adam = Adam(params=current_brain.parameters(), lr=0.0075)
+    OPTIMIZER: Adam = Adam(params=current_brain.parameters(), lr=0.0005)
     worse_episodes_since_best: int = 0
 
     for frame_number in range(1, number_of_frames + 1):
@@ -140,7 +136,7 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
         action: int = current_brain.get_action(x=state.unsqueeze(0).to(Globals.DEVICE_TYPE), epsilon=epsilon)
         reward: float = env.act(action=action_set[action])
         is_done: bool = env.game_over()
-        next_state: Tensor = preprocess(get_state())
+        next_state: Tensor = preprocess(get_state().T if 'conv' in brain_type else get_state())
         replay_buffer.store_memory(state=state.unsqueeze(0), action=action, reward=reward,
                                    next_state=next_state.unsqueeze(0), is_done=is_done)
         episode_reward += reward
@@ -255,10 +251,10 @@ if __name__ == '__main__':
     outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = {}
     kwargs: dict = {
         'alpha': 0.6,
-        'capacity': 20_000,
-        'replay_amount': 2_500,
+        'capacity': 1_024,
+        'replay_amount': 128,
         'number_of_frames': 10_000_000,
-        'update_threshold': 10_000,
+        'update_threshold': 512,
         'out': outcomes
     }
     train_agents(**kwargs)
