@@ -31,7 +31,6 @@ from classes.data.preprocessors.game_state.PixelCopterGameStatePreprocessor impo
 def update_target(current: Union[ConvolutionalDQN, ConvolutionalDuelingDQN, LinearDQN, LinearDuelingDQN],
                   target: Union[ConvolutionalDQN, ConvolutionalDuelingDQN, LinearDQN, LinearDuelingDQN]) -> None:
     target.load_state_dict(current.state_dict())
-    print('updated')
 
 
 def get_epsilon(frame_number: int) -> float:
@@ -134,6 +133,7 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
     state: Tensor = preprocess(get_state())
     episode_reward: float = 0.0
     OPTIMIZER: Adam = Adam(params=current_brain.parameters(), lr=0.0075)
+    worse_episodes_since_best: int = 0
 
     for frame_number in range(1, number_of_frames + 1):
         epsilon: float = get_epsilon(frame_number)
@@ -153,6 +153,9 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
                 checkpoint[game_name][brain_type] = episode_reward
                 update_target(current=current_brain, target=target_brain)
                 save_model(model=target_brain, file_name=f'{file_name}.pth')
+                worse_episodes_since_best = 0
+            else:
+                worse_episodes_since_best += 1
             episode_reward = 0
 
         if len(replay_buffer) >= replay_amount:
@@ -164,6 +167,11 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
         if frame_number % update_threshold == 0:
             update_target(current=current_brain, target=target_brain)
             print(f'{(frame_number / number_of_frames) * 100}% done training {file_name}')
+
+        if worse_episodes_since_best > 2 * update_threshold:
+            worse_episodes_since_best = 0
+            state_dict: dict = t_load(f'{file_name}.pth')
+            target_brain.load_state_dict(state_dict=state_dict)
 
     return losses, rewards
 
