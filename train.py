@@ -1,9 +1,11 @@
 from os import mkdir
+from math import inf
 from math import exp
+from json import dump
 from time import time
 from copy import deepcopy
 from os.path import exists
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Dict
 
 from ple import PLE
 from torch.optim import Adam
@@ -29,12 +31,13 @@ from classes.data.preprocessors.game_state.PixelCopterGameStatePreprocessor impo
 def update_target(current: Union[ConvolutionalDQN, ConvolutionalDuelingDQN, LinearDQN, LinearDuelingDQN],
                   target: Union[ConvolutionalDQN, ConvolutionalDuelingDQN, LinearDQN, LinearDuelingDQN]) -> None:
     target.load_state_dict(current.state_dict())
+    print('updated')
 
 
 def get_epsilon(frame_number: int) -> float:
-    INIT_EPSILON: float = 0.4
+    INIT_EPSILON: float = 1.0
     MIN_EPSILON: float = 0.01
-    EPSILON_DECAY: float = 500
+    EPSILON_DECAY: float = 500.0
     return MIN_EPSILON + (INIT_EPSILON - MIN_EPSILON) * exp(-1.0 * frame_number / EPSILON_DECAY)
 
 
@@ -56,23 +59,31 @@ def save_model(model: Union[ConvolutionalDQN, ConvolutionalDuelingDQN, LinearDQN
     t_save(state_dict, file_name)
 
 
-def get_environment(is_flappy: bool) -> PLE:
-    GAME: Union[Pixelcopter,
-                FlappyBird] = FlappyBird(width=Globals.GAME_WIDTH, height=Globals.GAME_HEIGHT) if is_flappy else \
-        Pixelcopter(width=Globals.GAME_WIDTH, height=Globals.GAME_HEIGHT)
+def get_environment(is_flappy: bool, brain_type: str) -> PLE:
+    GAME: Union[Pixelcopter, FlappyBird]
+    GAME_WIDTH: int = 256
+    GAME_HEIGHT: int = 512
+    GAME = Pixelcopter(width=384, height=384) if 'linear' in brain_type else Pixelcopter(width=GAME_WIDTH,
+                                                                                         height=GAME_HEIGHT)
+    if is_flappy:
+        GAME = FlappyBird() if 'linear' in brain_type else FlappyBird(width=GAME_WIDTH, height=GAME_HEIGHT)
     return PLE(GAME, reward_values=Globals.TRAINING_REWARD_VALUES, display_screen=True)
 
 
 def get_brain(brain_type: str, env: PLE) -> Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
                                                   LinearDQN, LinearDuelingDQN]:
     number_of_actions: int = len(env.getActionSet())
+    GAME_WIDTH: int
+    GAME_HEIGHT: int
+    GAME_WIDTH, GAME_HEIGHT = env.getScreenDims()
     if 'linear' in brain_type:
-        return LinearDQN(number_of_observations=7, number_of_actions=number_of_actions) if 'dqn' in brain_type else \
-            LinearDuelingDQN(number_of_observations=7, number_of_actions=number_of_actions)
-    return ConvolutionalDQN(in_channels=1, number_of_actions=number_of_actions, game_width=Globals.GAME_WIDTH,
-                            game_height=Globals.GAME_HEIGHT) if 'dqn' in brain_type else \
-        ConvolutionalDuelingDQN(in_channels=1, number_of_actions=number_of_actions, game_height=Globals.GAME_HEIGHT,
-                                game_width=Globals.GAME_WIDTH)
+        return LinearDuelingDQN(number_of_observations=7,
+                                number_of_actions=number_of_actions) if 'dueling' in brain_type else \
+            LinearDQN(number_of_observations=7, number_of_actions=number_of_actions)
+    return ConvolutionalDuelingDQN(in_channels=1, number_of_actions=number_of_actions, game_height=GAME_HEIGHT,
+                                   game_width=GAME_WIDTH) if 'dueling' in brain_type else \
+        ConvolutionalDQN(in_channels=1, number_of_actions=number_of_actions, game_width=GAME_WIDTH,
+                         game_height=GAME_HEIGHT)
 
 
 def get_preprocessing_function(is_flappy: bool, brain_type: str) -> callable:
@@ -113,8 +124,9 @@ def learn(replay_buffer: ReplayBuffer, replay_amount: int, beta: float,
 def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, replay_amount: int, get_state: callable,
                  current_brain: Union[ConvolutionalDQN, ConvolutionalDuelingDQN, LinearDQN, LinearDuelingDQN],
                  target_brain: Union[ConvolutionalDQN, ConvolutionalDuelingDQN, LinearDQN, LinearDuelingDQN],
-                 file_name: str, preprocess: callable, update_threshold: int, action_set: dict) -> Tuple[List[float],
-                                                                                                         List[float]]:
+                 file_name: str, preprocess: callable, update_threshold: int, action_set: Dict[int, Union[int, None]],
+                 checkpoint: Dict[str, Dict[str, float]], brain_type: str, game_name: str) -> Tuple[List[float],
+                                                                                                    List[float]]:
     losses: List[float] = []
     rewards: List[float] = []
     env.reset_game()
@@ -137,6 +149,10 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
         if is_done:
             env.reset_game()
             rewards.append(episode_reward)
+            if episode_reward > checkpoint[game_name][brain_type]:
+                checkpoint[game_name][brain_type] = episode_reward
+                update_target(current=current_brain, target=target_brain)
+                save_model(model=target_brain, file_name=f'{file_name}.pth')
             episode_reward = 0
 
         if len(replay_buffer) >= replay_amount:
@@ -145,18 +161,17 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
                          target=target_brain, optimizer=OPTIMIZER)
             losses.append(loss)
 
-        if frame_number % update_threshold == 0 and frame_number >= replay_amount:
+        if frame_number % update_threshold == 0:
             update_target(current=current_brain, target=target_brain)
-            save_model(model=target_brain, file_name=file_name)
-
-        if frame_number % 1_000 == 0:
-            print(f'{(frame_number / number_of_frames) * 100}% done training')
+            print(f'{(frame_number / number_of_frames) * 100}% done training {file_name}')
 
     return losses, rewards
 
 
-def train_agents(number_of_frames: int, replay_amount: int, update_threshold: int, capacity: int, alpha: float) -> None:
+def train_agents(number_of_frames: int, replay_amount: int, update_threshold: int, capacity: int, alpha: float,
+                 out: Dict[str, Dict[str, Dict[str, Union[int, float]]]]) -> None:
     REPLAY_BUFFER: ReplayBuffer = ReplayBuffer(capacity=capacity, alpha=alpha)
+    checkpoint: Dict[str, Dict[str, float]] = {}
     kwa: dict = {
         'env': None,
         'action_set': None,
@@ -168,27 +183,37 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
         'file_name': None,
         'preprocess': None,
         'replay_amount': replay_amount,
-        'update_threshold': update_threshold
+        'update_threshold': update_threshold,
+        'checkpoint': checkpoint,
+        'brain_type': None,
+        'game_name': None
     }
 
     for is_flappy in [False, True]:
         brain_dir: str = Globals.BRAIN_FLAPPY_DIR_PATH if is_flappy else Globals.BRAIN_COPTER_DIR_PATH
         game_name: str = 'flappy' if is_flappy else 'copter'
-        env: PLE = get_environment(is_flappy=is_flappy)
-        env.init()
-        kwa['env'] = env
-        action_set: dict = env.getActionSet()
-        kwa['action_set'] = {0: action_set[0], 1: action_set[1]}
+        out[game_name] = {}
+        kwa['game_name'] = game_name
+        kwa['checkpoint'][game_name] = {}
 
         total_training_time: float = 0.0
         for brain_type in Globals.BRAIN_TYPES:
+            kwa['brain_type'] = brain_type
+            out[game_name][brain_type] = {}
+            kwa['checkpoint'][game_name][brain_type] = -inf
+            env: PLE = get_environment(is_flappy=is_flappy, brain_type=brain_type)
+            env.init()
+            kwa['env'] = env
+            action_set: dict = env.getActionSet()
+            kwa['action_set'] = {0: action_set[0], 1: action_set[1]}
             kwa['get_state'] = env.getGameState if 'linear' in brain_type else env.getScreenGrayscale
-            FILE_NAME: str = f'{brain_dir}{brain_type}.pth'
+            FILE_NAME: str = f'{brain_dir}{brain_type}'
             current_brain: Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
                                  LinearDQN, LinearDuelingDQN] = get_brain(brain_type=brain_type, env=env)
 
             if is_flappy:
-                state_dict: dict = t_load(f=f'{Globals.BRAIN_COPTER_DIR_PATH}{brain_type}.pth')
+                state_dict: dict = t_load(
+                    f=f'{Globals.BRAIN_COPTER_DIR_PATH}{brain_type}_best.pth')
                 current_brain.load_state_dict(state_dict=state_dict)
 
             kwa['file_name'] = FILE_NAME
@@ -203,19 +228,34 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
             training_end: float = time() - training_start
             REPLAY_BUFFER.clear_memory()
             total_training_time += training_end
-            print(f'{game_name} {brain_type} took {training_end} seconds to train')
 
-            Artist.save_line_graph(plot_data=losses, plot_title=f'{game_name}_{brain_type}_losses.png')
-            Artist.save_line_graph(plot_data=rewards, plot_title=f'{game_name}_{brain_type}_rewards.png')
+            out[game_name][brain_type]['training_time'] = training_end
+            out[game_name][brain_type]['rewards_max'] = max(rewards)
+            out[game_name][brain_type]['rewards_min'] = min(rewards)
+            out[game_name][brain_type]['rewards_mean'] = sum(rewards) / len(rewards)
+            out[game_name][brain_type]['losses_max'] = max(losses)
+            out[game_name][brain_type]['losses_min'] = min(losses)
+            out[game_name][brain_type]['losses_mean'] = sum(losses) / len(losses)
+
+            Artist.save_line_graph(plot_data=losses,
+                                   plot_title=f'{game_name}_{brain_type}losses.png')
+            Artist.save_line_graph(plot_data=rewards,
+                                   plot_title=f'{game_name}_{brain_type}rewards.png')
 
 
 if __name__ == '__main__':
-    KWA: dict = {
+    outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = {}
+    kwargs: dict = {
         'alpha': 0.6,
-        'capacity': 2_500,
-        'replay_amount': 200,
-        'number_of_frames': 50_000,
-        'update_threshold': 400
+        'capacity': 20_000,
+        'replay_amount': 2_500,
+        'number_of_frames': 10_000_000,
+        'update_threshold': 10_000,
+        'out': outcomes
     }
+    train_agents(**kwargs)
 
-    train_agents(**KWA)
+    if not exists(Globals.OUTCOMES_DIR_PATH):
+        mkdir(Globals.OUTCOMES_DIR_PATH)
+    with open(f'{Globals.OUTCOMES_FILE_NAME_START}_training.json', 'w') as outcomes_file:
+        dump(outcomes, outcomes_file, indent=2)
