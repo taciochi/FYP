@@ -1,12 +1,10 @@
-import json
-import sys
-from os import mkdir
 from math import inf
 from math import exp
 from json import dump
 from time import time
 from copy import deepcopy
 from os.path import exists
+from os import mkdir, environ
 from typing import List, Union, Tuple, Dict
 
 from ple import PLE
@@ -324,6 +322,7 @@ def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha:
 
 
 if __name__ == '__main__':
+    environ["SDL_VIDEODRIVER"] = "dummy"
     outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = {}
     kwargs: dict = {'alpha': 0.6, 'capacity': 1_024, 'replay_amount': 128, 'number_of_frames': 128_000,
                     'update_threshold': 512, 'out': outcomes}
