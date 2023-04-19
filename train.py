@@ -324,15 +324,13 @@ def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha:
 
 
 if __name__ == '__main__':
-    # outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = {}
-    outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = json.load(
-        open('outcomes/outcomes_training.json', 'r'))
-    kwargs: dict = {'alpha': 0.6, 'capacity': 1_024, 'replay_amount': 128, 'number_of_frames': 1_000,
+    outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = {}
+    kwargs: dict = {'alpha': 0.6, 'capacity': 1_024, 'replay_amount': 128, 'number_of_frames': 128_000,
                     'update_threshold': 512, 'out': outcomes}
-    # train_agents(**kwargs)
-    kwargs['number_of_frames'] = 1_100
+    train_agents(**kwargs)
+    kwargs['number_of_frames'] *= 10
     train_flappy(**kwargs, improve=True)
-    # train_flappy(**kwargs, improve=False)
+    train_flappy(**kwargs, improve=False)
 
     if not exists(Globals.OUTCOMES_DIR_PATH):
         mkdir(Globals.OUTCOMES_DIR_PATH)
