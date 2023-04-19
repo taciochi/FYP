@@ -322,7 +322,8 @@ def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha:
 
 
 if __name__ == '__main__':
-    environ["SDL_VIDEODRIVER"] = "dummy"
+    environ['SDL_VIDEODRIVER'] = 'dummy'
+    environ['SDL_AUDIODRIVER'] = 'dummy'
     outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = {}
     kwargs: dict = {'alpha': 0.6, 'capacity': 1_024, 'replay_amount': 128, 'number_of_frames': 128_000,
                     'update_threshold': 512, 'out': outcomes}
