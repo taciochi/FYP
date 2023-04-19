@@ -66,7 +66,7 @@ def get_environment(is_flappy: bool, brain_type: str) -> PLE:
                                                                                          height=384)
     if is_flappy:
         GAME = FlappyBird() if 'linear' in brain_type else FlappyBird()
-    return PLE(GAME, reward_values=Globals.TRAINING_REWARD_VALUES, display_screen=True)
+    return PLE(GAME, reward_values=Globals.TRAINING_REWARD_VALUES, display_screen=False)
 
 
 def get_brain(brain_type: str, env: PLE) -> Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
