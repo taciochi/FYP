@@ -1,3 +1,4 @@
+import json
 import sys
 from os import mkdir
 from math import inf
@@ -164,10 +165,10 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
             update_target(current=current_brain, target=target_brain)
             print(f'{(frame_number / number_of_frames) * 100}% done training {file_name}')
 
-        if worse_episodes_since_best > 2 * update_threshold:
-            worse_episodes_since_best = 0
-            state_dict: dict = t_load(f'{file_name}.pth')
-            target_brain.load_state_dict(state_dict=state_dict)
+        # if worse_episodes_since_best > 128 and exists(f'{file_name}.pth'):
+        #     worse_episodes_since_best = 0
+        #     state_dict: dict = t_load(f'{file_name}.pth')
+        #     target_brain.load_state_dict(state_dict=state_dict)
 
     return losses, rewards
 
@@ -217,7 +218,7 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
 
             if is_flappy:
                 state_dict: dict = t_load(
-                    f=f'{Globals.BRAIN_COPTER_DIR_PATH}{brain_type}_best.pth')
+                    f=f'{Globals.BRAIN_COPTER_DIR_PATH}{brain_type}.pth')
                 current_brain.load_state_dict(state_dict=state_dict)
 
             kwa['file_name'] = FILE_NAME
@@ -242,24 +243,98 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
             out[game_name][brain_type]['losses_mean'] = sum(losses) / len(losses)
 
             Artist.save_line_graph(plot_data=losses,
-                                   plot_title=f'{game_name}_{brain_type}losses.png')
+                                   plot_title=f'{game_name}_{brain_type}_losses')
             Artist.save_line_graph(plot_data=rewards,
-                                   plot_title=f'{game_name}_{brain_type}rewards.png')
+                                   plot_title=f'{game_name}_{brain_type}_rewards')
+
+
+def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha: float, capacity: int,
+                 replay_amount: int, update_threshold: int, number_of_frames: int, improve: bool) -> None:
+    REPLAY_BUFFER: ReplayBuffer = ReplayBuffer(capacity=capacity, alpha=alpha)
+    checkpoint: Dict[str, Dict[str, float]] = {
+        'flappy': {
+
+        },
+    }
+    brain_type: str = 'convolutional_dueling_dqn'
+    reward: float = -inf
+
+    if improve:
+        for key in out['flappy'].keys():
+            if out['flappy'][key]['rewards_max'] > reward:
+                brain_type = key
+
+    checkpoint['flappy'][brain_type] = reward
+
+    ENV: PLE = get_environment(is_flappy=True, brain_type=brain_type)
+    ENV.init()
+    CURRENT_BRAIN: Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
+                         LinearDQN, LinearDuelingDQN] = get_brain(brain_type=brain_type, env=ENV)
+
+    if improve:
+        state_dict: dict = t_load(
+            f=f'{Globals.BRAIN_FLAPPY_DIR_PATH}{brain_type}.pth')
+        CURRENT_BRAIN.load_state_dict(state_dict=state_dict)
+
+    TARGET_BRAIN: Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
+                        LinearDQN, LinearDuelingDQN] = deepcopy(CURRENT_BRAIN)
+
+    CURRENT_BRAIN.to(Globals.DEVICE_TYPE)
+    TARGET_BRAIN.to(Globals.DEVICE_TYPE)
+    PREPROCESS: callable = get_preprocessing_function(is_flappy=True, brain_type=brain_type)
+
+    extension: str = '_' + ('final' if improve else 'solo')
+
+    kwa: dict = {
+        'env': ENV,
+        'action_set': ENV.getActionSet(),
+        'replay_buffer': REPLAY_BUFFER,
+        'number_of_frames': number_of_frames,
+        'current_brain': CURRENT_BRAIN,
+        'target_brain': TARGET_BRAIN,
+        'get_state': ENV.getGameState if 'linear' in brain_type else ENV.getScreenGrayscale,
+        'file_name': f'{Globals.BRAIN_FLAPPY_DIR_PATH}{brain_type}{extension}',
+        'preprocess': PREPROCESS,
+        'replay_amount': replay_amount,
+        'update_threshold': update_threshold,
+        'checkpoint': checkpoint,
+        'brain_type': brain_type,
+        'game_name': 'flappy'
+    }
+
+    losses: List[float]
+    rewards: List[float]
+    training_start: float = time()
+    losses, rewards = run_training(**kwa)
+    training_end: float = time() - training_start
+
+    out['flappy'][f'{brain_type}{extension}'] = {}
+    out['flappy'][f'{brain_type}{extension}']['training_time'] = training_end
+    out['flappy'][f'{brain_type}{extension}']['rewards_max'] = max(rewards)
+    out['flappy'][f'{brain_type}{extension}']['rewards_min'] = min(rewards)
+    out['flappy'][f'{brain_type}{extension}']['rewards_mean'] = sum(rewards) / len(rewards)
+    out['flappy'][f'{brain_type}{extension}']['losses_max'] = max(losses)
+    out['flappy'][f'{brain_type}{extension}']['losses_min'] = min(losses)
+    out['flappy'][f'{brain_type}{extension}']['losses_mean'] = sum(losses) / len(losses)
+
+    Artist.save_line_graph(plot_data=losses,
+                           plot_title=f'flappy_{brain_type}{extension}_losses')
+    Artist.save_line_graph(plot_data=rewards,
+                           plot_title=f'flappy_{brain_type}{extension}_rewards')
 
 
 if __name__ == '__main__':
-    outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = {}
-    kwargs: dict = {
-        'alpha': 0.6,
-        'capacity': 1_024,
-        'replay_amount': 128,
-        'number_of_frames': 10_000_000,
-        'update_threshold': 512,
-        'out': outcomes
-    }
-    train_agents(**kwargs)
+    # outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = {}
+    outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = json.load(
+        open('outcomes/outcomes_training.json', 'r'))
+    kwargs: dict = {'alpha': 0.6, 'capacity': 1_024, 'replay_amount': 128, 'number_of_frames': 1_000,
+                    'update_threshold': 512, 'out': outcomes}
+    # train_agents(**kwargs)
+    kwargs['number_of_frames'] = 1_100
+    train_flappy(**kwargs, improve=True)
+    # train_flappy(**kwargs, improve=False)
 
     if not exists(Globals.OUTCOMES_DIR_PATH):
         mkdir(Globals.OUTCOMES_DIR_PATH)
-    with open(f'{Globals.OUTCOMES_FILE_NAME_START}_training.json', 'w') as outcomes_file:
-        dump(outcomes, outcomes_file, indent=2)
+    with open(f'{Globals.OUTCOMES_FILE_NAME_START}training.json', 'w') as outcomes_file:
+        dump(kwargs['out'], outcomes_file, indent=2)

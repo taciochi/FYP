@@ -12,11 +12,11 @@ class ConvolutionalDuelingDQN(ConvolutionalModel):
 
     def __init__(self, in_channels: int, number_of_actions: int, game_width: int, game_height: int):
         super(ConvolutionalDuelingDQN, self).__init__()
-        self.conv1 = Conv2d(in_channels, 32, kernel_size=3, stride=1)
-        self.conv2 = Conv2d(32, 32, kernel_size=3, stride=1)
+        self.conv1 = Conv2d(in_channels, 64, kernel_size=3, stride=1)
+        self.conv2 = Conv2d(64, 32, kernel_size=3, stride=1)
         self.conv3 = Conv2d(32, 16, kernel_size=3, stride=1)
 
-        self.bn2d_conv1 = BatchNorm2d(num_features=32)
+        self.bn2d_conv1 = BatchNorm2d(num_features=64)
         self.bn2d_conv2 = BatchNorm2d(num_features=32)
         self.bn2d_conv3 = BatchNorm2d(num_features=16)
         self.bn1d_fc1_adv = BatchNorm1d(num_features=512)
@@ -53,4 +53,5 @@ class ConvolutionalDuelingDQN(ConvolutionalModel):
         img = zeros((1, height, width), requires_grad=False)
         out = self.conv1(img)
         out = self.conv2(out)
+        out = self.conv3(out)
         return out.view(1, -1).size(1)

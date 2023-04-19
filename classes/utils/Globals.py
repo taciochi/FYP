@@ -14,13 +14,13 @@ class Globals:
     OUTCOMES_DIR_PATH: str = 'outcomes/'
     OUTCOMES_FILE_NAME_START: str = OUTCOMES_DIR_PATH + 'outcomes_'
 
-    BRAIN_TYPES: List[str] = ['convolutional_dqn', 'convolutional_dueling_dqn', 'linear_dqn', 'linear_dueling_dqn']
+    BRAIN_TYPES: List[str] = ['convolutional_dueling_dqn', 'convolutional_dqn', 'linear_dueling_dqn', 'linear_dqn']
     IMG_SIZE: int = 64
 
     TRAINING_REWARD_VALUES: Dict[str, float] = {
         'negative': -8.0,
         'positive': 10.0,
-        'tick': 1.0,
+        'tick': 0.0,
         'loss': -8,
         'win': 10.0
     }
