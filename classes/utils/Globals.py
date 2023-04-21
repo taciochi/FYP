@@ -1,7 +1,13 @@
-from typing import Dict, List
+from typing import Dict, List, Union
 
+from ple import PLE
 from torch import device
 from torch.cuda import is_available
+
+from classes.model.linear.LinearDQN import LinearDQN
+from classes.model.convolutional.ConvDQN import ConvolutionalDQN
+from classes.model.linear.LinearDuelingDQN import LinearDuelingDQN
+from classes.model.convolutional.ConvDuelingDQN import ConvolutionalDuelingDQN
 
 
 class Globals:
@@ -24,10 +30,22 @@ class Globals:
         'loss': -8,
         'win': 10.0
     }
-    TESTING_REWARD_VALUES: Dict[str, float] = {
+    PLAYING_REWARD_VALUES: Dict[str, float] = {
         'negative': 0.0,
-        'positive': 10.0,
+        'positive': 10.0002,
         'tick': 0.0,
         'loss': 0,
-        'win': 10.0
+        'win': 10.0002
     }
+
+    @staticmethod
+    def get_brain(brain_type: str, number_of_actions: int) -> Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
+                                                                    LinearDQN, LinearDuelingDQN]:
+        if 'linear' in brain_type:
+            return LinearDuelingDQN(number_of_observations=7,
+                                    number_of_actions=number_of_actions) if 'dueling' in brain_type else \
+                LinearDQN(number_of_observations=7, number_of_actions=number_of_actions)
+        return ConvolutionalDuelingDQN(in_channels=1, number_of_actions=number_of_actions, game_height=Globals.IMG_SIZE,
+                                       game_width=Globals.IMG_SIZE) if 'dueling' in brain_type else \
+            ConvolutionalDQN(in_channels=1, number_of_actions=number_of_actions, game_width=Globals.IMG_SIZE,
+                             game_height=Globals.IMG_SIZE)

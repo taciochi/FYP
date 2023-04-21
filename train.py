@@ -15,8 +15,8 @@ from torch import Tensor, no_grad
 from ple.games.flappybird import FlappyBird
 from ple.games.pixelcopter import Pixelcopter
 
-from classes.utils.Globals import Globals
 from classes.utils.Artist import Artist
+from classes.utils.Globals import Globals
 from classes.model.linear.LinearDQN import LinearDQN
 from classes.data.memory.ReplayBuffer import ReplayBuffer
 from classes.model.convolutional.ConvDQN import ConvolutionalDQN
@@ -58,26 +58,12 @@ def save_model(model: Union[ConvolutionalDQN, ConvolutionalDuelingDQN, LinearDQN
     t_save(state_dict, file_name)
 
 
-def get_environment(is_flappy: bool, brain_type: str) -> PLE:
+def get_environment(is_flappy: bool) -> PLE:
     GAME: Union[Pixelcopter, FlappyBird]
-    GAME = Pixelcopter(width=384, height=384) if 'linear' in brain_type else Pixelcopter(width=384,
-                                                                                         height=384)
+    GAME = Pixelcopter(width=384, height=384)
     if is_flappy:
-        GAME = FlappyBird() if 'linear' in brain_type else FlappyBird()
-    return PLE(GAME, reward_values=Globals.TRAINING_REWARD_VALUES, display_screen=False)
-
-
-def get_brain(brain_type: str, env: PLE) -> Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
-                                                  LinearDQN, LinearDuelingDQN]:
-    number_of_actions: int = len(env.getActionSet())
-    if 'linear' in brain_type:
-        return LinearDuelingDQN(number_of_observations=7,
-                                number_of_actions=number_of_actions) if 'dueling' in brain_type else \
-            LinearDQN(number_of_observations=7, number_of_actions=number_of_actions)
-    return ConvolutionalDuelingDQN(in_channels=1, number_of_actions=number_of_actions, game_height=Globals.IMG_SIZE,
-                                   game_width=Globals.IMG_SIZE) if 'dueling' in brain_type else \
-        ConvolutionalDQN(in_channels=1, number_of_actions=number_of_actions, game_width=Globals.IMG_SIZE,
-                         game_height=Globals.IMG_SIZE)
+        GAME = FlappyBird()
+    return PLE(GAME, reward_values=Globals.TRAINING_REWARD_VALUES, display_screen=True)
 
 
 def get_preprocessing_function(is_flappy: bool, brain_type: str) -> callable:
@@ -163,11 +149,6 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
             update_target(current=current_brain, target=target_brain)
             print(f'{(frame_number / number_of_frames) * 100}% done training {file_name}')
 
-        # if worse_episodes_since_best > 128 and exists(f'{file_name}.pth'):
-        #     worse_episodes_since_best = 0
-        #     state_dict: dict = t_load(f'{file_name}.pth')
-        #     target_brain.load_state_dict(state_dict=state_dict)
-
     return losses, rewards
 
 
@@ -204,15 +185,16 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
             kwa['brain_type'] = brain_type
             out[game_name][brain_type] = {}
             kwa['checkpoint'][game_name][brain_type] = -inf
-            env: PLE = get_environment(is_flappy=is_flappy, brain_type=brain_type)
+            env: PLE = get_environment(is_flappy=is_flappy)
             env.init()
             kwa['env'] = env
             action_set: dict = env.getActionSet()
             kwa['action_set'] = {0: action_set[0], 1: action_set[1]}
             kwa['get_state'] = env.getGameState if 'linear' in brain_type else env.getScreenGrayscale
             FILE_NAME: str = f'{brain_dir}{brain_type}'
-            current_brain: Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
-                                 LinearDQN, LinearDuelingDQN] = get_brain(brain_type=brain_type, env=env)
+            current_brain: Union[ConvolutionalDQN, ConvolutionalDuelingDQN, LinearDQN,
+                                 LinearDuelingDQN] = Globals.get_brain(brain_type=brain_type,
+                                                                       number_of_actions=len(env.getActionSet()))
 
             if is_flappy:
                 state_dict: dict = t_load(
@@ -259,15 +241,17 @@ def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha:
 
     if improve:
         for key in out['flappy'].keys():
-            if out['flappy'][key]['rewards_max'] > reward:
+            if out['flappy'][key]['rewards_max'] >= reward:
                 brain_type = key
+                reward = out['flappy'][key]['rewards_max']
 
-    checkpoint['flappy'][brain_type] = reward
+    checkpoint['flappy'][brain_type] = -inf
 
-    ENV: PLE = get_environment(is_flappy=True, brain_type=brain_type)
+    ENV: PLE = get_environment(is_flappy=True)
     ENV.init()
     CURRENT_BRAIN: Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
-                         LinearDQN, LinearDuelingDQN] = get_brain(brain_type=brain_type, env=ENV)
+                         LinearDQN, LinearDuelingDQN] = Globals.get_brain(brain_type=brain_type,
+                                                                          number_of_actions=len(ENV.getActionSet()))
 
     if improve:
         state_dict: dict = t_load(
@@ -321,10 +305,25 @@ def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha:
                            plot_title=f'flappy_{brain_type}{extension}_rewards')
 
 
+def train_demo() -> None:
+    outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = dict()
+    kwargs: dict = {'alpha': 0.6, 'capacity': 1_024, 'replay_amount': 5, 'number_of_frames': 100,
+                    'update_threshold': 25, 'out': outcomes}
+    train_agents(**kwargs)
+    kwargs['number_of_frames'] *= 10
+    train_flappy(**kwargs, improve=True)
+    train_flappy(**kwargs, improve=False)
+
+    if not exists(Globals.OUTCOMES_DIR_PATH):
+        mkdir(Globals.OUTCOMES_DIR_PATH)
+    with open(f'{Globals.OUTCOMES_FILE_NAME_START}training.json', 'w') as outcomes_file:
+        dump(kwargs['out'], outcomes_file, indent=2)
+
+
 if __name__ == '__main__':
     environ['SDL_VIDEODRIVER'] = 'dummy'
     environ['SDL_AUDIODRIVER'] = 'dummy'
-    outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = {}
+    outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = dict()
     kwargs: dict = {'alpha': 0.6, 'capacity': 1_024, 'replay_amount': 128, 'number_of_frames': 128_000,
                     'update_threshold': 512, 'out': outcomes}
     train_agents(**kwargs)
