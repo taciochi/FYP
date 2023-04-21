@@ -3,7 +3,7 @@ from random import random, randrange
 from torch import no_grad
 from torch import zeros, Tensor
 from torch.nn.functional import relu
-from torch.nn import Conv2d, Linear, BatchNorm2d, BatchNorm1d
+from torch.nn import Conv2d, Linear, BatchNorm2d, BatchNorm1d, Dropout
 
 from interfaces.model.convolutional.ConvolutionalModel import ConvolutionalModel
 
@@ -16,6 +16,7 @@ class ConvolutionalDQN(ConvolutionalModel):
         self.conv1 = Conv2d(in_channels, 64, kernel_size=3, stride=1)
         self.conv2 = Conv2d(64, 32, kernel_size=3, stride=1)
         self.conv3 = Conv2d(32, 16, kernel_size=3, stride=1)
+        self.drop = Dropout(p=0.2)
 
         self.bn2d_conv1 = BatchNorm2d(num_features=64)
         self.bn2d_conv2 = BatchNorm2d(num_features=32)
@@ -33,7 +34,7 @@ class ConvolutionalDQN(ConvolutionalModel):
         latent = self.bn2d_conv3(relu(self.conv3(latent)))
         flat = latent.view(x.size(0), -1)
         latent = self.bn1d_fc1(relu(self.fc1(flat)))
-        q = self.fc2(latent)
+        q = self.fc2(self.drop(latent))
         return q
 
     def get_action(self, x: Tensor, epsilon: float) -> int:

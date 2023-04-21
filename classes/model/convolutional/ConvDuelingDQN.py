@@ -3,7 +3,7 @@ from random import random, randrange
 from torch import no_grad
 from torch import zeros, Tensor
 from torch.nn.functional import relu
-from torch.nn import Conv2d, Linear, BatchNorm2d, BatchNorm1d
+from torch.nn import Conv2d, Linear, BatchNorm2d, BatchNorm1d, Dropout
 
 from interfaces.model.convolutional.ConvolutionalModel import ConvolutionalModel
 
@@ -15,6 +15,7 @@ class ConvolutionalDuelingDQN(ConvolutionalModel):
         self.conv1 = Conv2d(in_channels, 64, kernel_size=3, stride=1)
         self.conv2 = Conv2d(64, 32, kernel_size=3, stride=1)
         self.conv3 = Conv2d(32, 16, kernel_size=3, stride=1)
+        self.drop = Dropout(p=0.2)
 
         self.bn2d_conv1 = BatchNorm2d(num_features=64)
         self.bn2d_conv2 = BatchNorm2d(num_features=32)
@@ -36,8 +37,8 @@ class ConvolutionalDuelingDQN(ConvolutionalModel):
         flat = latent.view(x.size(0), -1)
         adv = self.bn1d_fc1_adv(relu(self.fc1_adv(flat)))
         val = self.bn1d_fc1_val(relu(self.fc1_val(flat)))
-        adv = self.fc2_adv(adv)
-        val = self.fc2_val(val).expand(flat.size(0), self.fc2_adv.out_features)
+        adv = self.fc2_adv(self.drop(adv))
+        val = self.fc2_val(self.drop(val)).expand(flat.size(0), self.fc2_adv.out_features)
         q = val + adv - adv.mean(1, keepdim=True)
         return q
 
