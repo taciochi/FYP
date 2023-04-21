@@ -27,7 +27,7 @@ class ConvolutionalDQN(ConvolutionalModel):
         self.fc1 = Linear(fc_input, 512)
         self.fc2 = Linear(512, number_of_actions)
 
-    def forward(self, x) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         latent = self.bn2d_conv1(relu(self.conv1(x)))
         latent = self.bn2d_conv2(relu(self.conv2(latent)))
         latent = self.bn2d_conv3(relu(self.conv3(latent)))

@@ -29,7 +29,7 @@ class ConvolutionalDuelingDQN(ConvolutionalModel):
         self.fc2_adv = Linear(512, number_of_actions)
         self.fc2_val = Linear(512, 1)
 
-    def forward(self, x) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         latent = self.bn2d_conv1(relu(self.conv1(x)))
         latent = self.bn2d_conv2(relu(self.conv2(latent)))
         latent = self.bn2d_conv3(relu(self.conv3(latent)))
