@@ -3,6 +3,7 @@ from json import dump
 from os import listdir
 from typing import Dict, Union, List
 
+from classes.utils.Artist import Artist
 from ple import PLE
 from torch import Tensor
 from torch import load as t_load
@@ -17,26 +18,12 @@ from classes.data.preprocessors.image.FlappyBirdImagePreprocessor import FlappyB
 from classes.data.preprocessors.game_state.FlappyBirdGameStatePreprocessor import FlappyBirdGameStatePreprocessor
 
 
-def get_brain_types() -> List[str]:
-    desired: List[str] = []
-    brain_types: List[str] = listdir(f'{Globals.BRAIN_FLAPPY_DIR_PATH}')
-
-    for brain_type in brain_types:
-        if 'solo' in brain_type:
-            desired = [*desired, brain_type]
-            continue
-        if 'final' in brain_type:
-            desired = [*desired, brain_type]
-
-    return desired
-
-
 def play_flappy(number_of_episodes: int = 10) -> None:
     outcomes: Dict[str, Dict[str, float]] = dict()
     ENV: PLE = PLE(FlappyBird(), display_screen=True, reward_values=Globals.PLAYING_REWARD_VALUES)
     ENV.init()
     ACTION_SET = {0: ENV.getActionSet()[0], 1: ENV.getActionSet()[1]}
-    for brain_type in get_brain_types():
+    for brain_type in listdir(f'{Globals.BRAIN_FLAPPY_DIR_PATH}'):
         outcomes[brain_type] = dict()
         brain: Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
                      LinearDQN, LinearDuelingDQN] = Globals.get_brain(brain_type=brain_type,
@@ -61,6 +48,8 @@ def play_flappy(number_of_episodes: int = 10) -> None:
 
             rewards = [*rewards, episode_reward]
 
+        Artist.save_line_graph(plot_data=rewards,
+                               plot_title=f'flappy_{brain_type}_rewards_play')
         outcomes[brain_type]['max_reward'] = max(rewards)
         outcomes[brain_type]['min_reward'] = min(rewards)
         outcomes[brain_type]['mean_reward'] = sum(rewards) / len(rewards)

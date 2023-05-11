@@ -11,9 +11,9 @@ class FlappyBirdGameStatePreprocessor(GameStatePreprocessor):
         velocity: float = game_state['player_vel']
         next_pipe_top_y: float = game_state['next_pipe_top_y']
         next_pipe_bottom_y: float = game_state['next_pipe_bottom_y']
-        distance_to_next_pipe: float = game_state['next_pipe_dist_to_player']
+        distance_to_next_next_pipe: float = game_state['next_next_pipe_dist_to_player']
         next_next_pipe_top_y: float = game_state['next_next_pipe_top_y']
         next_next_pipe_bottom_y: float = game_state['next_next_pipe_bottom_y']
 
-        return tensor([y_position, velocity, next_pipe_top_y, next_pipe_bottom_y, distance_to_next_pipe,
+        return tensor([y_position, velocity, next_pipe_top_y, next_pipe_bottom_y, distance_to_next_next_pipe,
                        next_next_pipe_top_y, next_next_pipe_bottom_y], requires_grad=False)

@@ -20,6 +20,6 @@ class FlappyBirdImagePreprocessor(ImagePreprocessor):
         tmp: Tensor = Resize((Globals.IMG_SIZE, Globals.IMG_SIZE))(from_numpy(expand_dims(image, axis=0)))
         image = tmp.squeeze(0).detach().numpy()
         del tmp
-        image = vectorize(lambda pixel: pixel / 255)(image)  # normalize image
+        image = vectorize(lambda x: x/255)(image)  # normalize image
         image = expand_dims(image, axis=0)  # add channels input
         return tensor(data=image, requires_grad=requires_grad, dtype=t_float)

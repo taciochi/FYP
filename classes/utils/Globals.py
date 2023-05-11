@@ -24,10 +24,10 @@ class Globals:
     IMG_SIZE: int = 64
 
     TRAINING_REWARD_VALUES: Dict[str, float] = {
-        'negative': -8.0,
+        'negative': -7.5,
         'positive': 10.0,
         'tick': 0.0,
-        'loss': -8,
+        'loss': -7.5,
         'win': 10.0
     }
     PLAYING_REWARD_VALUES: Dict[str, float] = {

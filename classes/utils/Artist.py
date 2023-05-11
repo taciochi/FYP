@@ -4,7 +4,7 @@ from typing import Union, List
 
 from torch import Tensor
 from numpy import ndarray
-from matplotlib.pyplot import imshow, plot, title, savefig, clf
+from matplotlib.pyplot import imshow, plot, savefig, clf
 
 
 class Artist:
@@ -20,7 +20,6 @@ class Artist:
     @staticmethod
     def save_line_graph(plot_data: List[float], plot_title: str) -> None:
         plot(plot_data)
-        title(plot_title)
         Artist.__save_to_disk(file_name=f'{plot_title}.png')
         clf()
 

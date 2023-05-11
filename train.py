@@ -114,7 +114,6 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
     state: Tensor = preprocess(get_state().T if 'conv' in brain_type else get_state())
     episode_reward: float = 0.0
     OPTIMIZER: Adam = Adam(params=current_brain.parameters(), lr=0.0005)
-    worse_episodes_since_best: int = 0
 
     for frame_number in range(1, number_of_frames + 1):
         epsilon: float = get_epsilon(frame_number)
@@ -134,9 +133,6 @@ def run_training(env: PLE, replay_buffer: ReplayBuffer, number_of_frames: int, r
                 checkpoint[game_name][brain_type] = episode_reward
                 update_target(current=current_brain, target=target_brain)
                 save_model(model=target_brain, file_name=f'{file_name}.pth')
-                worse_episodes_since_best = 0
-            else:
-                worse_episodes_since_best += 1
             episode_reward = 0
 
         if len(replay_buffer) >= replay_amount:
@@ -172,8 +168,14 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
         'brain_type': None,
         'game_name': None
     }
+    transfer_learning_increase: bool = False
 
     for is_flappy in [False, True]:
+        if is_flappy and not transfer_learning_increase:
+            print(number_of_frames)
+            number_of_frames *= 10
+            print(number_of_frames)
+            transfer_learning_increase = False
         brain_dir: str = Globals.BRAIN_FLAPPY_DIR_PATH if is_flappy else Globals.BRAIN_COPTER_DIR_PATH
         game_name: str = 'flappy' if is_flappy else 'copter'
         out[game_name] = {}
@@ -217,10 +219,8 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
             out[game_name][brain_type]['training_time'] = training_end
             out[game_name][brain_type]['rewards_max'] = max(rewards)
             out[game_name][brain_type]['rewards_min'] = min(rewards)
-            out[game_name][brain_type]['rewards_mean'] = sum(rewards) / len(rewards)
             out[game_name][brain_type]['losses_max'] = max(losses)
             out[game_name][brain_type]['losses_min'] = min(losses)
-            out[game_name][brain_type]['losses_mean'] = sum(losses) / len(losses)
 
             Artist.save_line_graph(plot_data=losses,
                                    plot_title=f'{game_name}_{brain_type}_losses')
@@ -229,7 +229,7 @@ def train_agents(number_of_frames: int, replay_amount: int, update_threshold: in
 
 
 def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha: float, capacity: int,
-                 replay_amount: int, update_threshold: int, number_of_frames: int, improve: bool) -> None:
+                 replay_amount: int, update_threshold: int, number_of_frames: int) -> None:
     REPLAY_BUFFER: ReplayBuffer = ReplayBuffer(capacity=capacity, alpha=alpha)
     checkpoint: Dict[str, Dict[str, float]] = {
         'flappy': {
@@ -237,14 +237,6 @@ def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha:
         },
     }
     brain_type: str = 'convolutional_dueling_dqn'
-    reward: float = -inf
-
-    if improve:
-        for key in out['flappy'].keys():
-            if out['flappy'][key]['rewards_max'] >= reward:
-                brain_type = key
-                reward = out['flappy'][key]['rewards_max']
-
     checkpoint['flappy'][brain_type] = -inf
 
     ENV: PLE = get_environment(is_flappy=True)
@@ -253,11 +245,6 @@ def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha:
                          LinearDQN, LinearDuelingDQN] = Globals.get_brain(brain_type=brain_type,
                                                                           number_of_actions=len(ENV.getActionSet()))
 
-    if improve:
-        state_dict: dict = t_load(
-            f=f'{Globals.BRAIN_FLAPPY_DIR_PATH}{brain_type}.pth')
-        CURRENT_BRAIN.load_state_dict(state_dict=state_dict)
-
     TARGET_BRAIN: Union[ConvolutionalDQN, ConvolutionalDuelingDQN,
                         LinearDQN, LinearDuelingDQN] = deepcopy(CURRENT_BRAIN)
 
@@ -265,7 +252,6 @@ def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha:
     TARGET_BRAIN.to(Globals.DEVICE_TYPE)
     PREPROCESS: callable = get_preprocessing_function(is_flappy=True, brain_type=brain_type)
 
-    extension: str = '_' + ('final' if improve else 'solo')
 
     kwa: dict = {
         'env': ENV,
@@ -274,8 +260,8 @@ def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha:
         'number_of_frames': number_of_frames,
         'current_brain': CURRENT_BRAIN,
         'target_brain': TARGET_BRAIN,
-        'get_state': ENV.getGameState if 'linear' in brain_type else ENV.getScreenGrayscale,
-        'file_name': f'{Globals.BRAIN_FLAPPY_DIR_PATH}{brain_type}{extension}',
+        'get_state': ENV.getScreenGrayscale,
+        'file_name': f'{Globals.BRAIN_FLAPPY_DIR_PATH}{brain_type}_solo',
         'preprocess': PREPROCESS,
         'replay_amount': replay_amount,
         'update_threshold': update_threshold,
@@ -290,46 +276,32 @@ def train_flappy(out: Dict[str, Dict[str, Dict[str, Union[int, float]]]], alpha:
     losses, rewards = run_training(**kwa)
     training_end: float = time() - training_start
 
-    out['flappy'][f'{brain_type}{extension}'] = {}
-    out['flappy'][f'{brain_type}{extension}']['training_time'] = training_end
-    out['flappy'][f'{brain_type}{extension}']['rewards_max'] = max(rewards)
-    out['flappy'][f'{brain_type}{extension}']['rewards_min'] = min(rewards)
-    out['flappy'][f'{brain_type}{extension}']['rewards_mean'] = sum(rewards) / len(rewards)
-    out['flappy'][f'{brain_type}{extension}']['losses_max'] = max(losses)
-    out['flappy'][f'{brain_type}{extension}']['losses_min'] = min(losses)
-    out['flappy'][f'{brain_type}{extension}']['losses_mean'] = sum(losses) / len(losses)
+    out['flappy'][f'{brain_type}_solo'] = {}
+    out['flappy'][f'{brain_type}_solo']['training_time'] = training_end
+    out['flappy'][f'{brain_type}_solo']['rewards_max'] = max(rewards)
+    out['flappy'][f'{brain_type}_solo']['rewards_min'] = min(rewards)
+    out['flappy'][f'{brain_type}_solo']['rewards_mean'] = sum(rewards) / len(rewards)
+    out['flappy'][f'{brain_type}_solo']['losses_max'] = max(losses)
+    out['flappy'][f'{brain_type}_solo']['losses_min'] = min(losses)
+    out['flappy'][f'{brain_type}_solo']['losses_mean'] = sum(losses) / len(losses)
 
     Artist.save_line_graph(plot_data=losses,
-                           plot_title=f'flappy_{brain_type}{extension}_losses')
+                           plot_title=f'flappy_{brain_type}_solo_losses')
     Artist.save_line_graph(plot_data=rewards,
-                           plot_title=f'flappy_{brain_type}{extension}_rewards')
-
-
-def train_demo() -> None:
-    outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = dict()
-    kwargs: dict = {'alpha': 0.6, 'capacity': 1_024, 'replay_amount': 5, 'number_of_frames': 100,
-                    'update_threshold': 25, 'out': outcomes}
-    train_agents(**kwargs)
-    kwargs['number_of_frames'] *= 10
-    train_flappy(**kwargs, improve=True)
-    train_flappy(**kwargs, improve=False)
-
-    if not exists(Globals.OUTCOMES_DIR_PATH):
-        mkdir(Globals.OUTCOMES_DIR_PATH)
-    with open(f'{Globals.OUTCOMES_FILE_NAME_START}training.json', 'w') as outcomes_file:
-        dump(kwargs['out'], outcomes_file, indent=2)
+                           plot_title=f'flappy_{brain_type}_solo_rewards')
 
 
 if __name__ == '__main__':
-    environ['SDL_VIDEODRIVER'] = 'dummy'
-    environ['SDL_AUDIODRIVER'] = 'dummy'
+    # environ['SDL_VIDEODRIVER'] = 'dummy'
+    # environ['SDL_AUDIODRIVER'] = 'dummy'
     outcomes: Dict[str, Dict[str, Dict[str, Union[int, float]]]] = dict()
     kwargs: dict = {'alpha': 0.6, 'capacity': 1_024, 'replay_amount': 128, 'number_of_frames': 128_000,
                     'update_threshold': 512, 'out': outcomes}
     train_agents(**kwargs)
+    print(kwargs['number_of_frames'])
     kwargs['number_of_frames'] *= 10
-    train_flappy(**kwargs, improve=True)
-    train_flappy(**kwargs, improve=False)
+    print(kwargs['number_of_frames'])
+    train_flappy(**kwargs)
 
     if not exists(Globals.OUTCOMES_DIR_PATH):
         mkdir(Globals.OUTCOMES_DIR_PATH)
